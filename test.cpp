@@ -1,8 +1,10 @@
 #include <vector>
 #include <iostream>
 #include <windows.h>
+#include <chrono>
 
 using namespace std;
+using namespace std::chrono_literals;
 
 #define snakeBodyASCII 186
 #define snakeTurningLeftUpASCII 187 
@@ -20,6 +22,7 @@ void moveCursor(int x, int y) {
         COORD{(short)x, (short)y}
     );
 }
+
 void hideCursor() {
     HANDLE hStdOut = NULL;
     CONSOLE_CURSOR_INFO curInfo;
@@ -44,7 +47,7 @@ public:
     SnakeBody * prev;
     int direction; // 0 - down; 1 - left; 2 - up; 3 - right;
 
-    SnakeBody(char body, SnakeBody * prev, vector<vector<char>> * grid, int x, int y) {
+    SnakeBody(char body, SnakeBody * prev, vector<vector<char>> * grid, int y, int x) {
         this->body = body;
         this->prev = prev;
         this->next = nullptr;
@@ -53,22 +56,23 @@ public:
         this->position.y = y;
 
         // set char in grid
-        this->gridPtr->data()[x][y] = this->body;
+        this->gridPtr->data()[y][x] = this->body;
     }
 
     Position move(int x, int y) {
         Position _ret = this->position;
-        this->gridPtr->data()[this->position.x][this->position.y] = backGroudASCII;
+        this->gridPtr->data()[this->position.y][this->position.x] = backGroudASCII;
 
         this->position.x = x;
         this->position.y = y;
         
-        this->gridPtr->data()[this->position.x][this->position.y] = snakeBodyASCII;
+        this->gridPtr->data()[this->position.y][this->position.x] = snakeBodyASCII;
         return _ret;
     }
 };
 
 void moveSnake(SnakeBody * head) {
+    SnakeBody * it = head;
     int prevX = head->position.x, prevY = head->position.y;
     switch(head->direction) {
         case 0: {
@@ -88,12 +92,12 @@ void moveSnake(SnakeBody * head) {
         }
     }
 
-    while(head != nullptr) {
-        Position prevPos = head->move(prevX, prevY);
+    while(it != nullptr) {
+        Position prevPos = it->move(prevX, prevY);
         prevX = prevPos.x;
         prevY = prevPos.y;
 
-        head = head->next;
+        it = it->next;
     }
 }
 
@@ -103,14 +107,25 @@ int main() {
 
     vector<vector<char>> grid 
         = vector<vector<char>>
-        (10, vector<char>(20, backGroudASCII));
+        (10, vector<char>(20, char(backGroudASCII)));
     
-    SnakeBody head = SnakeBody(char(snakeBodyASCII), nullptr, &grid, 0, 0);
+    SnakeBody head = SnakeBody(char(snakeBodyASCII), nullptr, &grid, 1, 0);
     SnakeBody * it = &head;
-    it->next = new SnakeBody(char(snakeBodyASCII), it, &grid, 1, 0);
+    it->next = new SnakeBody(char(snakeBodyASCII), it, &grid, 0, 0);
+    it = it->next;
 
+    auto start = chrono::high_resolution_clock::now();
+    auto updateTimerStart = start;
     while (true)
     {
+        // Update timer
+        auto currTime = chrono::high_resolution_clock::now();
+        auto timePassed = currTime - updateTimerStart;
+        if(chrono::duration_cast<chrono::seconds>(timePassed).count() >= 1.f) {
+            moveSnake(&head); 
+            updateTimerStart = currTime;
+        }
+
         moveCursor(0, 0);
         for (auto row : grid) {
             for (auto el : row) {
@@ -118,8 +133,6 @@ int main() {
             }
             cout << "\n";
         } 
-
-        moveSnake(&head);
     }
     
     return 0;
