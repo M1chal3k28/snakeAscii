@@ -19,20 +19,17 @@ using namespace std::chrono_literals;
 #ifdef _WIN32
     LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
         switch (uMsg) {
-            // Zablokuj zmianę rozmiaru okna
             case WM_SIZING:
             case WM_SIZE:
-                return 0; // Ignoruj komunikaty zmiany rozmiaru
+                return 0;
 
-            // Zablokuj maksymalizację i minimalizację
             case WM_SYSCOMMAND:
                 if (wParam == SC_MAXIMIZE || wParam == SC_MINIMIZE || wParam == SC_RESTORE) {
-                    return 0; // Ignoruj komunikaty maksymalizacji/minimalizacji
+                    return 0;
                 }
                 break;
         }
 
-        // Domyślna obsługa komunikatów
         return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }    
 #endif
