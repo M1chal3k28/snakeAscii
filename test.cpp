@@ -16,6 +16,96 @@ using namespace std::chrono_literals;
 #define backGroudASCII 32
 #define appleASCII 254
 
+#ifdef _WIN32
+    LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+        switch (uMsg) {
+            // Zablokuj zmianę rozmiaru okna
+            case WM_SIZING:
+            case WM_SIZE:
+                return 0; // Ignoruj komunikaty zmiany rozmiaru
+
+            // Zablokuj maksymalizację i minimalizację
+            case WM_SYSCOMMAND:
+                if (wParam == SC_MAXIMIZE || wParam == SC_MINIMIZE || wParam == SC_RESTORE) {
+                    return 0; // Ignoruj komunikaty maksymalizacji/minimalizacji
+                }
+                break;
+        }
+
+        // Domyślna obsługa komunikatów
+        return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    }    
+#endif
+
+void setConsoleSize(int width, int height) {
+    #ifdef _WIN32
+        // TODO 
+    #else 
+        throw "Not implemented for this platform";
+    #endif
+}
+
+bool isRunningAsAdmin() {
+    #ifdef _WIN32
+        bool isAdmin = false;
+        HANDLE hToken = NULL;
+
+        if ( OpenProcessToken( GetCurrentProcess(), TOKEN_QUERY, &hToken) ) {
+            TOKEN_ELEVATION elevation;
+            DWORD size;
+            if ( GetTokenInformation(hToken, 
+            TokenElevation, &elevation, sizeof(elevation), &size) ) {
+                isAdmin = elevation.TokenIsElevated;
+            }
+        }
+
+        if ( hToken )
+            CloseHandle( hToken );
+        
+        return isAdmin;
+    #else 
+        throw "Not implemented for this platform";
+    #endif
+}
+
+void restartAsAdmin() {
+    #ifdef _WIN32
+        char path[MAX_PATH];
+        GetModuleFileName(NULL, path, MAX_PATH);
+
+        SHELLEXECUTEINFO sei = { sizeof(sei) };
+        sei.lpVerb = "runas";
+        sei.lpFile = path;
+        sei.hwnd = NULL;
+        sei.nShow = SW_NORMAL;
+
+        if (!ShellExecuteEx(&sei)) {
+            std::cerr << "Can't run as an administrator !\n";
+        }
+    #else 
+        throw "Not implemented for this platform";
+    #endif
+}   
+
+void disableConsoleResizing() {
+    #ifdef _WIN32
+        HWND hwnd = GetConsoleWindow();
+        if (hwnd == NULL) {
+            return;
+        }
+
+        SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)WindowProc);
+
+        LONG style = GetWindowLong(hwnd, GWL_STYLE);
+        style &= ~(WS_THICKFRAME | WS_MAXIMIZEBOX | WS_MINIMIZEBOX);
+        SetWindowLong(hwnd, GWL_STYLE, style);
+
+        SetWindowPos(hwnd, NULL, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
+    #else 
+        throw "Not implemented for this platform";
+    #endif
+}
+
 bool getInput(char * key) { 
     #ifdef _WIN32
         if(kbhit()) {
@@ -24,6 +114,17 @@ bool getInput(char * key) {
         }
 
         return false;
+    #else 
+        throw "Not implemented for this platform";
+    #endif
+}
+
+void getConsoleSize(int * width, int * height) {
+    #ifdef _WIN32
+        CONSOLE_SCREEN_BUFFER_INFO csbi;
+        GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
+        *width = csbi.dwSize.X;
+        *height = csbi.dwSize.Y;
     #else 
         throw "Not implemented for this platform";
     #endif
@@ -136,27 +237,32 @@ void moveSnake(SnakeBody * head) {
 }
 
 int main() {
+    if (!isRunningAsAdmin()) {
+        restartAsAdmin();
+        return 0;
+    }
+
+    disableConsoleResizing();
     hideCursor();
+    setConsoleSize(250, 250);
     system("cls");
 
     vector<vector<char>> grid 
         = vector<vector<char>>
-        (11, vector<char>(21, char(backGroudASCII)));
+        (21, vector<char>(36, char(backGroudASCII)));
     
-    for (int i = 0; i < 11; i++)
-        grid[i][20] = char(snakeBodyASCII);
+    for (int i = 0; i < 21; i++)
+        grid[i][35] = char(snakeBodyASCII);
 
-    for (int i = 0; i < 20; i++)
-        grid[10][i] = char(snakeBodyASCII);
+    for (int i = 0; i < 36; i++)
+        grid[20][i] = char(snakeBodyHorizontalASCII);
     
     SnakeBody head = SnakeBody(char(appleASCII), nullptr, &grid, 1, 0);
     SnakeBody * it = &head;
-    it->next = new SnakeBody(char(appleASCII), it, &grid, 0, 0);
-    it = it->next;
-    it->next = new SnakeBody(char(appleASCII), it, &grid, 0, 0);
-    it = it->next;
-    it->next = new SnakeBody(char(appleASCII), it, &grid, 0, 0);
-    it = it->next;
+    for (int i = 0; i < 20; i++) {
+        it->next = new SnakeBody(char(snakeBodyASCII), it, &grid, 1, 0);
+        it = it->next;
+    }
 
     auto start = chrono::high_resolution_clock::now();
     auto updateTimerStart = start;
@@ -164,17 +270,18 @@ int main() {
     {
         // Check input
         char key = ' ';
-        getInput(&key);
-        if (key == 'q') {
-            break;
-        } else if (key == 'w') {
-            head.direction = 2;
-        } else if (key == 'a') {
-            head.direction = 1;
-        } else if (key == 's') {
-            head.direction = 0;
-        } else if (key == 'd') {
-            head.direction = 3;
+        if (getInput(&key)) {
+            if (tolower(key) == 'q' || key == 27) {
+                break;
+            } else if (tolower(key) == 'w') {
+                head.direction = 2;
+            } else if (tolower(key) == 'a') {
+                head.direction = 1;
+            } else if (tolower(key) == 's') {
+                head.direction = 0;
+            } else if (tolower(key) == 'd') {
+                head.direction = 3;
+            }
         }
 
         // Update timer
