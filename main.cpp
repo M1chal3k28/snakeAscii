@@ -34,9 +34,34 @@ using namespace std::chrono_literals;
     }    
 #endif
 
-void setConsoleSize(int width, int height) {
+void setConsoleSize(int columns, int rows) {
     #ifdef _WIN32
-        // TODO 
+        HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (hConsole == INVALID_HANDLE_VALUE) {
+            MessageBox(NULL, "Could not get console handle", "Console", MB_ICONWARNING);
+            return;
+        }
+
+        CONSOLE_SCREEN_BUFFER_INFO csbi;
+        if (!GetConsoleScreenBufferInfo(hConsole, &csbi)) {
+            MessageBox(NULL, "Failed to get console buffer info", "Console", MB_ICONWARNING);
+            return;
+        }
+
+        SMALL_RECT tempRect = { 0, 0, 1, 1 }; 
+        SetConsoleWindowInfo(hConsole, TRUE, &tempRect);
+
+        COORD bufferSize = { static_cast<SHORT>(columns), static_cast<SHORT>(rows) };
+        if (!SetConsoleScreenBufferSize(hConsole, bufferSize)) {
+            MessageBox(NULL, "Failed to set console buffer size", "Console", MB_ICONWARNING);
+            return;
+        }
+
+        SMALL_RECT windowSize = { 0, 0, static_cast<SHORT>(columns - 1), static_cast<SHORT>(rows - 1) };
+        if (!SetConsoleWindowInfo(hConsole, TRUE, &windowSize)) {
+            MessageBox(NULL, "Failed to set console window size", "Console", MB_ICONWARNING);
+            return;
+        }
     #else 
         throw "Not implemented for this platform";
     #endif
@@ -239,9 +264,9 @@ int main() {
         return 0;
     }
 
+    setConsoleSize(37, 22);
     disableConsoleResizing();
     hideCursor();
-    setConsoleSize(250, 250);
     system("cls");
 
     vector<vector<char>> grid 
