@@ -7,6 +7,9 @@
 using namespace std;
 using namespace std::chrono_literals;
 
+#define GRID_COLLS 37
+#define GRID_ROWS 22
+
 #define snakeBodyASCII 186
 #define snakeBodyHorizontalASCII 205
 #define snakeTurningLeftUpASCII 187 
@@ -15,6 +18,10 @@ using namespace std::chrono_literals;
 #define snakeTurningRightUpASCII 201
 #define backGroudASCII 32
 #define appleASCII 254
+
+#define redColor "\033[31m"
+#define greenColor "\033[32m"
+#define defaultColor "\033[0m"
 
 #ifdef _WIN32
     LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -34,7 +41,73 @@ using namespace std::chrono_literals;
     }    
 #endif
 
-void setConsoleSize(int columns, int rows) {
+class CellColor {
+public:
+    CellColor() = delete;
+    CellColor(CellColor&) = delete;
+
+    enum Value {
+        Red = 0,
+        Green,
+        Default
+    };
+
+    static void drawWithColor(CellColor::Value& color, char& toDraw) {
+        switch (color)
+        {
+        case CellColor::Red:
+            cout << redColor << toDraw << defaultColor;
+            break;
+        
+        case CellColor::Green:
+            cout << greenColor << toDraw << defaultColor;
+            break;
+
+        default:
+            cout << toDraw;
+            break;
+        }
+    }
+};
+
+class GridCell {
+public:
+    char data;
+    CellColor::Value color;
+    
+    GridCell(char data, CellColor::Value color)
+        : data(data), color(color) {}
+    
+    GridCell& operator=(char data) {
+        this->data = data;
+        return *this;
+    }
+
+    GridCell& operator=(CellColor::Value color) {
+        this->color = color;
+        return *this;
+    }
+
+    GridCell& operator=(GridCell cell) {
+        this->data = cell.data;
+        this->color = cell.color;
+        return *this;
+    }
+    
+    bool operator!=(char data) {
+        return this->data != data;
+    }
+
+    bool operator==(char data) {
+        return this->data == data;
+    }
+
+    void draw() {
+        CellColor::drawWithColor(this->color, this->data);
+    }
+};
+
+void setConsoleSize(int columns /* witdh */, int rows /* height */) {
     #ifdef _WIN32
         HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
         if (hConsole == INVALID_HANDLE_VALUE) {
@@ -184,17 +257,16 @@ struct Position {
     int y;
 };
 
-class SnakeBody {
+class SnakeBody : public GridCell {
 public:
-    vector<vector<char>>* gridPtr;
+    vector<vector<GridCell>>* gridPtr;
     Position position;
-    char body;
     SnakeBody * next;
     SnakeBody * prev;
     int direction = 0; // 0 - down; 1 - left; 2 - up; 3 - right;
 
-    SnakeBody(char body, SnakeBody * prev, vector<vector<char>> * grid, int y, int x) {
-        this->body = body;
+    SnakeBody(GridCell body, SnakeBody * prev, vector<vector<GridCell>> * grid, int y, int x)
+        : GridCell(body) {
         this->prev = prev;
         this->next = nullptr;
         this->gridPtr = grid;
@@ -202,12 +274,12 @@ public:
         this->position.y = y;
 
         // set char in grid
-        this->gridPtr->data()[y][x] = this->body;
+        this->gridPtr->data()[y][x] = this->data;
     }
 
     Position move(int x, int y) {
         Position _ret = this->position;
-        this->gridPtr->data()[this->position.y][this->position.x] = backGroudASCII;
+        (this->gridPtr->data()[this->position.y][this->position.x] = char(backGroudASCII)) = CellColor::Default;
 
         this->position.x = x;
         this->position.y = y;
@@ -216,20 +288,25 @@ public:
             Position prevPos = this->prev->position;
             // if we go to the left or right normally
             if(prevPos.x - 1 == this->position.x || prevPos.x + 1 == this->position.x) {
-                this->body = snakeBodyHorizontalASCII;
+                this->data = snakeBodyHorizontalASCII;
             }
 
             // if we go to the up or down normally
             if(prevPos.y - 1 == this->position.y || prevPos.y + 1 == this->position.y) {
-                this->body = snakeBodyASCII;
+                this->data = snakeBodyASCII;
             }
         }
-        this->gridPtr->data()[this->position.y][this->position.x] = this->body;
+        (this->gridPtr->data()[this->position.y][this->position.x] = this->data) = this->color;
         return _ret;
     }
 };
 
-void moveSnake(SnakeBody * head) {
+void addBody(SnakeBody ** tail) {
+    (*tail)->next = new SnakeBody(GridCell((*tail)->data, (*tail)->color), tail, (*tail)->gridPtr, (*tail)->position.y, (*tail)->position.y);
+    (*tail) = (*tail)->next;
+}
+
+void moveSnake(SnakeBody * head, SnakeBody * tail) {
     int prevX = head->position.x, prevY = head->position.y;
     switch(head->direction) {
         case 0: {
@@ -249,6 +326,18 @@ void moveSnake(SnakeBody * head) {
         }
     }
 
+    // Check if player should eat apple
+    if(head->gridPtr->data()[prevY][prevX] == char(appleASCII)) {
+        addBody(&tail);
+    } // Check if player should die 
+    else if(head->gridPtr->data()[prevY][prevX] != char(backGroudASCII)) {
+        #ifdef _WIN32
+            MessageBox(NULL, "You died !", "Console", 0);
+        #endif
+
+        exit(0);
+    }
+
     while(head != nullptr) {
         Position prevPos = head->move(prevX, prevY);
         prevX = prevPos.x;
@@ -259,33 +348,40 @@ void moveSnake(SnakeBody * head) {
 }
 
 int main() {
-    if (!isRunningAsAdmin()) {
-        restartAsAdmin();
-        return 0;
-    }
+    // if (!isRunningAsAdmin()) {
+    //     restartAsAdmin();
+    //     return 0;
+    // }
 
-    setConsoleSize(37, 22);
+    setConsoleSize(37, 23); 
     disableConsoleResizing();
     hideCursor();
     system("cls");
 
-    vector<vector<char>> grid 
-        = vector<vector<char>>
-        (21, vector<char>(36, char(backGroudASCII)));
+    // Set up grid
+    vector<vector<GridCell>> grid 
+        = vector<vector<GridCell>>
+        (GRID_ROWS, vector<GridCell>(GRID_COLLS, GridCell(char(backGroudASCII), CellColor::Default)));
     
-    for (int i = 0; i < 21; i++)
-        grid[i][35] = char(snakeBodyASCII);
-
-    for (int i = 0; i < 36; i++)
-        grid[20][i] = char(snakeBodyHorizontalASCII);
-    
-    SnakeBody head = SnakeBody(char(appleASCII), nullptr, &grid, 1, 0);
-    SnakeBody * it = &head;
-    for (int i = 0; i < 20; i++) {
-        it->next = new SnakeBody(char(snakeBodyASCII), it, &grid, 1, 0);
-        it = it->next;
+    for (int i = 0; i < GRID_ROWS; i++) {
+        (grid[i][GRID_COLLS - 1] = char(snakeBodyASCII)) = CellColor::Green;
+        (grid[i][0] = char(snakeBodyASCII)) = CellColor::Green;
     }
 
+    for (int i = 0; i < GRID_COLLS; i++) {
+        (grid[GRID_ROWS - 1][i] = char(snakeBodyHorizontalASCII)) = CellColor::Green;
+        (grid[0][i] = char(snakeBodyHorizontalASCII)) = CellColor::Green;
+    }
+    
+    (grid[GRID_ROWS - 1][GRID_COLLS - 1] = char(snakeTurningLeftDownASCII)) = CellColor::Green;
+    (grid[GRID_ROWS - 1][0] = char(snakeTurningRightDownASCII)) = CellColor::Green;
+    (grid[0][0] = char(snakeTurningRightUpASCII)) = CellColor::Green;
+    (grid[0][GRID_COLLS - 1] = char(snakeTurningLeftUpASCII)) = CellColor::Green;
+
+    // Create snake object
+    SnakeBody head = SnakeBody(GridCell(char(appleASCII), CellColor::Red), nullptr, &grid, 1, 1);
+    SnakeBody * tail = &head;
+    
     auto start = chrono::high_resolution_clock::now();
     auto updateTimerStart = start;
     while (true)
@@ -310,7 +406,7 @@ int main() {
         auto currTime = chrono::high_resolution_clock::now();
         auto timePassed = currTime - updateTimerStart;
         if(chrono::duration_cast<chrono::milliseconds>(timePassed).count() >= ((head.direction == 0 || head.direction == 2) ? 300.f : 200.f)) {
-            moveSnake(&head); 
+            moveSnake(&head, tail); 
             updateTimerStart = currTime;
         }
 
@@ -318,7 +414,7 @@ int main() {
         moveCursor(0, 0);
         for (auto row : grid) {
             for (auto el : row) {
-                cout << el;
+                el.draw();
             }
             cout << "\n";
         } 
