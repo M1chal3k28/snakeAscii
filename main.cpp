@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <chrono>
 #include <conio.h>
+#include <cstdlib>
 
 using namespace std;
 using namespace std::chrono_literals;
@@ -301,12 +302,25 @@ public:
     }
 };
 
+void placeApple(vector<vector<GridCell>> * grid) {
+    vector<Position> freePos;
+    for(int i = 0; i < grid->size(); i++)
+        for(int j = 0; j < grid->data()[i].size(); j++)
+            if(grid->data()[i][j].data == backGroudASCII) 
+                freePos.push_back({j, i});
+
+    int index = rand() % freePos.size();
+    (grid->data()[freePos[index].y][freePos[index].x] = char(appleASCII)) = CellColor::Red;
+}
 void addBody(SnakeBody ** tail) {
-    (*tail)->next = new SnakeBody(GridCell((*tail)->data, (*tail)->color), tail, (*tail)->gridPtr, (*tail)->position.y, (*tail)->position.y);
+    (*tail)->next = new SnakeBody(GridCell((*tail)->data, CellColor::Default), *tail, (*tail)->gridPtr, (*tail)->position.y, (*tail)->position.x);
     (*tail) = (*tail)->next;
+
+    placeApple((*tail)->gridPtr);
 }
 
-void moveSnake(SnakeBody * head, SnakeBody * tail) {
+void moveSnake(SnakeBody * head, SnakeBody ** tail) {
+    bool ateApple = false;
     int prevX = head->position.x, prevY = head->position.y;
     switch(head->direction) {
         case 0: {
@@ -328,7 +342,7 @@ void moveSnake(SnakeBody * head, SnakeBody * tail) {
 
     // Check if player should eat apple
     if(head->gridPtr->data()[prevY][prevX] == char(appleASCII)) {
-        addBody(&tail);
+       addBody(tail);
     } // Check if player should die 
     else if(head->gridPtr->data()[prevY][prevX] != char(backGroudASCII)) {
         #ifdef _WIN32
@@ -347,16 +361,20 @@ void moveSnake(SnakeBody * head, SnakeBody * tail) {
     }
 }
 
+
 int main() {
-    // if (!isRunningAsAdmin()) {
-    //     restartAsAdmin();
-    //     return 0;
-    // }
+    if (!isRunningAsAdmin()) {
+        restartAsAdmin();
+        return 0;
+    }
 
     setConsoleSize(37, 23); 
     disableConsoleResizing();
     hideCursor();
     system("cls");
+    system("title C++ Snake in console");
+
+    srand(time(0));
 
     // Set up grid
     vector<vector<GridCell>> grid 
@@ -381,7 +399,10 @@ int main() {
     // Create snake object
     SnakeBody head = SnakeBody(GridCell(char(appleASCII), CellColor::Red), nullptr, &grid, 1, 1);
     SnakeBody * tail = &head;
-    
+
+    // place apple
+    placeApple(&grid);
+
     auto start = chrono::high_resolution_clock::now();
     auto updateTimerStart = start;
     while (true)
@@ -406,7 +427,7 @@ int main() {
         auto currTime = chrono::high_resolution_clock::now();
         auto timePassed = currTime - updateTimerStart;
         if(chrono::duration_cast<chrono::milliseconds>(timePassed).count() >= ((head.direction == 0 || head.direction == 2) ? 300.f : 200.f)) {
-            moveSnake(&head, tail); 
+            moveSnake(&head, &tail); 
             updateTimerStart = currTime;
         }
 
