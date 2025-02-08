@@ -25,6 +25,7 @@ using namespace std::chrono_literals;
 #define defaultColor "\033[0m"
 
 #ifdef _WIN32
+    // catch the windows events
     LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
         switch (uMsg) {
             case WM_SIZING:
@@ -37,7 +38,8 @@ using namespace std::chrono_literals;
                 }
                 break;
         }
-
+        
+        // pass unhandled messages to DefWindowProc - Default Window Procedure
         return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }    
 #endif
@@ -47,12 +49,18 @@ public:
     CellColor() = delete;
     CellColor(CellColor&) = delete;
 
+    // Enum representing different cell colors
     enum Value {
-        Red = 0,
-        Green,
-        Default
+        Red = 0,   ///< Red color
+        Green,     ///< Green color
+        Default    ///< Default color (no color)
     };
 
+    // Static function to draw a cell with the specified color
+    /**
+     * @param color The color to use for drawing the cell
+     * @param toDraw The character to draw
+     */
     static void drawWithColor(CellColor::Value& color, char& toDraw) {
         switch (color)
         {
@@ -71,43 +79,84 @@ public:
     }
 };
 
+// Constructor to create a GridCell with the specified data and color
+/**
+ * @param data The character to store in the cell
+ * @param color The color of the cell
+ */
 class GridCell {
 public:
+    // character of the cell
     char data;
+    // color of the cell
     CellColor::Value color;
     
     GridCell(char data, CellColor::Value color)
         : data(data), color(color) {}
     
+    // Assignment operator to set the data of the cell
+    /**
+     * @param data The new data to store in the cell
+     * @return A reference to the GridCell object
+     */
     GridCell& operator=(char data) {
         this->data = data;
         return *this;
     }
 
+    // Assignment operator to set the color of the cell
+    /**
+     * @param color The new color of the cell
+     * @return A reference to the GridCell object
+     */
     GridCell& operator=(CellColor::Value color) {
         this->color = color;
         return *this;
     }
 
+    // Assignment operator to copy the data and color from another GridCell
+    /**
+     * @param cell The GridCell object to copy from
+     * @return A reference to the GridCell object
+     */
     GridCell& operator=(GridCell cell) {
         this->data = cell.data;
         this->color = cell.color;
         return *this;
     }
-    
+
+    // Not equal operator to check if the cell data is not equal to another cell data
+    /**
+     * @param data The data to compare with
+     * @return True if the cell data is not equal to the specified data
+     */
     bool operator!=(char data) {
         return this->data != data;
     }
 
+    // Equal operator to check if the cell data is equal to another cell data
+    /**
+     * @param data The data to compare with
+     * @return True if the cell data is equal to the specified data
+     */
     bool operator==(char data) {
         return this->data == data;
     }
 
+    // Function to draw the cell with the specified color
+    /**
+     * Draws the cell using the CellColor::drawWithColor function
+     */
     void draw() {
         CellColor::drawWithColor(this->color, this->data);
     }
 };
 
+// Function to set the console size
+/**
+ * @param columns The new width of the console
+ * @param rows The new height of the console
+ */
 void setConsoleSize(int columns /* witdh */, int rows /* height */) {
     #ifdef _WIN32
         HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -141,6 +190,11 @@ void setConsoleSize(int columns /* witdh */, int rows /* height */) {
     #endif
 }
 
+// Function to check if the program is running as an administrator
+/**
+ * @param void
+ * @return True if the program is running as an administrator, false otherwise
+ */
 bool isRunningAsAdmin() {
     #ifdef _WIN32
         bool isAdmin = false;
@@ -164,6 +218,7 @@ bool isRunningAsAdmin() {
     #endif
 }
 
+// Restart the program as an administrator
 void restartAsAdmin() {
     #ifdef _WIN32
         char path[MAX_PATH];
@@ -183,6 +238,7 @@ void restartAsAdmin() {
     #endif
 }   
 
+// Disable console resizing by negating the window styles WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_HSCROLL, and WS_VSCROLL
 void disableConsoleResizing() {
     #ifdef _WIN32
         HWND hwnd = GetConsoleWindow();
@@ -202,6 +258,11 @@ void disableConsoleResizing() {
     #endif
 }
 
+// Get key press event
+/**
+ * @param key key to store the pressed key
+ * @return True if a key was pressed, false otherwise
+ */
 bool getInput(char * key) { 
     #ifdef _WIN32
         if(kbhit()) {
@@ -215,17 +276,7 @@ bool getInput(char * key) {
     #endif
 }
 
-void getConsoleSize(int * width, int * height) {
-    #ifdef _WIN32
-        CONSOLE_SCREEN_BUFFER_INFO csbi;
-        GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
-        *width = csbi.dwSize.X;
-        *height = csbi.dwSize.Y;
-    #else 
-        throw "Not implemented for this platform";
-    #endif
-}
-
+// Move the cursor to the specified position
 void moveCursor(int x, int y) {
     #ifdef _WIN32
         HANDLE consoleHandle = GetStdHandle((DWORD)STD_OUTPUT_HANDLE);
@@ -239,6 +290,7 @@ void moveCursor(int x, int y) {
     #endif
 }
 
+// Hide the console cursor
 void hideCursor() {
     #ifdef _WIN32
         HANDLE hStdOut = NULL;
@@ -258,6 +310,16 @@ struct Position {
     int y;
 };
 
+// Class to represent a snake body
+/**
+ * @class SnakeBody
+ * @brief Class to represent a snake body
+ * @param data The character to be drawn on the console
+ * @param color The color of the character
+ * @param position The position of the character on the console
+ * @param gridPtr The grid on which the character is drawn
+ * @param prev The previous snake body in the snake
+ */
 class SnakeBody : public GridCell {
 public:
     vector<vector<GridCell>>* gridPtr;
@@ -278,6 +340,12 @@ public:
         this->gridPtr->data()[y][x] = this->data;
     }
 
+    // Function to move the snake body
+    /**
+     * @param x The new x position of the snake body
+     * @param y The new y position of the snake body
+     * @return The previous position of the snake body
+     */
     Position move(int x, int y) {
         Position _ret = this->position;
         (this->gridPtr->data()[this->position.y][this->position.x] = char(backGroudASCII)) = CellColor::Default;
@@ -302,27 +370,108 @@ public:
     }
 };
 
-void placeApple(vector<vector<GridCell>> * grid) {
+// Function to place an apple on the grid
+/**
+ * @param grid The grid to place the apple on
+ * @brief looks for free spaces and places an apple there
+ * @return True if an apple was placed, false otherwise
+ */
+bool placeApple(vector<vector<GridCell>> * grid) {
+    // loop through the grid for free spaces
     vector<Position> freePos;
     for(int i = 0; i < grid->size(); i++)
         for(int j = 0; j < grid->data()[i].size(); j++)
             if(grid->data()[i][j].data == backGroudASCII) 
                 freePos.push_back({j, i});
+    
+    // if there are free spaces, place an apple there
+    if (freePos.size() > 0) {
+        int index = rand() % freePos.size();
+        (grid->data()[freePos[index].y][freePos[index].x] = char(appleASCII)) = CellColor::Red;
+        return true;
+    } 
 
-    int index = rand() % freePos.size();
-    (grid->data()[freePos[index].y][freePos[index].x] = char(appleASCII)) = CellColor::Red;
+    return false;
 }
+
+// Function to add a body part to the snake
 void addBody(SnakeBody ** tail) {
-    (*tail)->next = new SnakeBody(GridCell((*tail)->data, CellColor::Default), *tail, (*tail)->gridPtr, (*tail)->position.y, (*tail)->position.x);
+    (*tail)->next = new SnakeBody(
+        GridCell((*tail)->data, 
+        CellColor::Default), 
+        *tail, 
+        (*tail)->gridPtr, 
+        (*tail)->position.y, 
+        (*tail)->position.x
+    );
     (*tail) = (*tail)->next;
-
-    placeApple((*tail)->gridPtr);
 }
 
-void moveSnake(SnakeBody * head, SnakeBody ** tail) {
-    bool ateApple = false;
-    int prevX = head->position.x, prevY = head->position.y;
-    switch(head->direction) {
+// Function to restart the game
+/**
+ * @param head The head of the snake
+ * @param tail The tail of the snake
+ * @param grid The grid on which the snake is drawn
+ * @brief restarts the game
+ */
+void restartGame(SnakeBody & head, SnakeBody ** tail,vector<vector<GridCell>> * grid) {
+    // iterate over all elements of snake
+    SnakeBody * it = head.next;
+    while (it != nullptr) {
+        // set temporary pointer
+        SnakeBody * next = it->next;
+
+        // clear grid on this position
+        (grid->data()[it->position.y][it->position.x] = char(backGroudASCII)) = CellColor::Default;
+
+        // delete element
+        delete it;
+
+        // iterate
+        it = next;
+    }
+
+    // set head position to start position
+    // reset head
+    (grid->data()[head.position.y][head.position.x] = char(backGroudASCII)) = CellColor::Default;
+    head.position.x = grid->size() / 2;
+    head.position.y = grid->size() / 2;
+    head.next = nullptr;
+    head.prev = nullptr;
+    head.direction = 0;
+    
+    // reset tail
+    (*tail) = &head;
+}
+
+// Function to end the game if the player dies
+void gameOver(SnakeBody & head, SnakeBody ** tail, vector<vector<GridCell>> * grid) {
+    // Game over
+    #ifdef _WIN32
+        // ask user if they want to play again
+        int choice = MessageBox(NULL, "Game Over !", "Console", MB_RETRYCANCEL | MB_ICONHAND);
+        if (choice == IDRETRY) {
+            restartGame(head, tail, head.gridPtr);
+            return;
+        }
+    #endif
+
+    // exit game if user chooses to quit
+    exit(0);
+}
+
+// Function to move the snake
+/** 
+ * @brief moves the snake
+ * @param body The head of the snake
+ * @param tail The tail of the snake
+ */
+void moveSnake(SnakeBody * body, SnakeBody ** tail) {
+    // Get previous position
+    int prevX = body->position.x, prevY = body->position.y;
+
+    // Adjust head position based on direction
+    switch(body->direction) {
         case 0: {
             prevY += 1;
         } break;
@@ -341,26 +490,31 @@ void moveSnake(SnakeBody * head, SnakeBody ** tail) {
     }
 
     // Check if player should eat apple
-    if(head->gridPtr->data()[prevY][prevX] == char(appleASCII)) {
+    if(body->gridPtr->data()[prevY][prevX] == char(appleASCII)) {
+        // Add body part to snake
        addBody(tail);
-    } // Check if player should die 
-    else if(head->gridPtr->data()[prevY][prevX] != char(backGroudASCII)) {
-        #ifdef _WIN32
-            MessageBox(NULL, "You died !", "Console", 0);
-        #endif
 
-        exit(0);
+       if (!placeApple(body->gridPtr)) {
+           gameOver(*body, tail, body->gridPtr);
+           return;
+       }
+    } // Check if player should die 
+    else if(body->gridPtr->data()[prevY][prevX] != char(backGroudASCII)) {
+        gameOver(*body, tail, body->gridPtr);
+        return;
     }
 
-    while(head != nullptr) {
-        Position prevPos = head->move(prevX, prevY);
+    // Move snake parts
+    // body is iterator
+    while(body != nullptr) {
+        // get prev position of element before the next one to move properly
+        Position prevPos = body->move(prevX, prevY);
         prevX = prevPos.x;
         prevY = prevPos.y;
 
-        head = head->next;
+        body = body->next;
     }
 }
-
 
 int main() {
     if (!isRunningAsAdmin()) {
@@ -428,7 +582,7 @@ int main() {
         auto timePassed = currTime - updateTimerStart;
         if(chrono::duration_cast<chrono::milliseconds>(timePassed).count() >= ((head.direction == 0 || head.direction == 2) ? 300.f : 200.f)) {
             moveSnake(&head, &tail); 
-            // Draw
+            // Draw only when snake has moved
             moveCursor(0, 0);
             for (auto row : grid) {
                 for (auto el : row) {
