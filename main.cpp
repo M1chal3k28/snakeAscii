@@ -193,7 +193,7 @@ void disableConsoleResizing() {
         SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)WindowProc);
 
         LONG style = GetWindowLong(hwnd, GWL_STYLE);
-        style &= ~(WS_THICKFRAME | WS_MAXIMIZEBOX | WS_MINIMIZEBOX);
+        style &= ~(WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_HSCROLL | WS_VSCROLL);
         SetWindowLong(hwnd, GWL_STYLE, style);
 
         SetWindowPos(hwnd, NULL, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
@@ -428,17 +428,16 @@ int main() {
         auto timePassed = currTime - updateTimerStart;
         if(chrono::duration_cast<chrono::milliseconds>(timePassed).count() >= ((head.direction == 0 || head.direction == 2) ? 300.f : 200.f)) {
             moveSnake(&head, &tail); 
+            // Draw
+            moveCursor(0, 0);
+            for (auto row : grid) {
+                for (auto el : row) {
+                    el.draw();
+                }
+                cout << "\n";
+            } 
             updateTimerStart = currTime;
         }
-
-        // Draw
-        moveCursor(0, 0);
-        for (auto row : grid) {
-            for (auto el : row) {
-                el.draw();
-            }
-            cout << "\n";
-        } 
     }
     
     return 0;
