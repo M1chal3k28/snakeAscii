@@ -327,6 +327,7 @@ public:
     SnakeBody * next;
     SnakeBody * prev;
     int direction = 0; // 0 - down; 1 - left; 2 - up; 3 - right;
+    static int points;
 
     SnakeBody(GridCell body, SnakeBody * prev, vector<vector<GridCell>> * grid, int y, int x)
         : GridCell(body) {
@@ -335,6 +336,8 @@ public:
         this->gridPtr = grid;
         this->position.x = x;
         this->position.y = y;
+        
+        SnakeBody::points++;
 
         // set char in grid
         this->gridPtr->data()[y][x] = this->data;
@@ -369,6 +372,8 @@ public:
         return _ret;
     }
 };
+// Static variable to store the points
+int SnakeBody::points = -1;
 
 // Function to place an apple on the grid
 /**
@@ -442,6 +447,8 @@ void restartGame(SnakeBody & head, SnakeBody ** tail,vector<vector<GridCell>> * 
     
     // reset tail
     (*tail) = &head;
+
+    head.points = 0;
 }
 
 // Function to end the game if the player dies
@@ -522,7 +529,7 @@ int main() {
         return 0;
     }
 
-    setConsoleSize(37, 23); 
+    setConsoleSize(GRID_COLLS, GRID_ROWS + 1); 
     disableConsoleResizing();
     hideCursor();
     system("cls");
@@ -592,6 +599,9 @@ int main() {
             } 
             updateTimerStart = currTime;
         }
+
+        moveCursor(0, GRID_ROWS);
+        cout << "Pts: " << head.points;
     }
     
     return 0;
