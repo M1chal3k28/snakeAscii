@@ -4,6 +4,7 @@
 #include <chrono>
 #include <conio.h>
 #include <cstdlib>
+#include <iomanip>
 
 using namespace std;
 using namespace std::chrono_literals;
@@ -371,16 +372,72 @@ public:
         this->position.y = y;
         
         if (this->prev != nullptr) {
-            Position prevPos = this->prev->position;
-            // if we go to the left or right normally
-            if(prevPos.x - 1 == this->position.x || prevPos.x + 1 == this->position.x) {
-                this->data = snakeBodyHorizontalASCII;
+            Position followingElementCurr = this->prev->position;
+            Position followingElementPrev = this->position;
+            Position thisCurr = this->position;
+            Position thisPrev = _ret;
+
+            if ((followingElementCurr.x + 1 == thisCurr.x) ||
+                (followingElementCurr.x - 1 == thisCurr.x)) {
+                if (followingElementCurr.y == thisCurr.y) {
+                    this->data = char(snakeBodyHorizontalASCII);
+                }
             }
 
-            // if we go to the up or down normally
-            if(prevPos.y - 1 == this->position.y || prevPos.y + 1 == this->position.y) {
-                this->data = snakeBodyASCII;
+            if ((followingElementCurr.y + 1 == thisCurr.y) ||
+                (followingElementCurr.y - 1 == thisCurr.y)) {
+                if (followingElementCurr.x == thisCurr.x) {
+                    this->data = char(snakeBodyASCII);
+                }
             }
+            
+            // Going right up
+                if ((followingElementPrev.x + 1 == followingElementCurr.x) &&
+                    (thisPrev.y - 1 == thisCurr.y)) {
+                    this->data = char(snakeTurningRightUpASCII);
+                }
+                
+                // When we're going right and then up
+                if ((followingElementPrev.y - 1 == followingElementCurr.y) && 
+                    (thisPrev.x + 1 == thisCurr.x)) {
+                    this->data = char(snakeTurningLeftDownASCII);
+                }
+
+            // Going right down
+                if ((followingElementPrev.x + 1 == followingElementCurr.x) &&
+                    (thisPrev.y + 1 == thisCurr.y)) {
+                    this->data = char(snakeTurningRightDownASCII);
+                }
+
+                // When we're going right and then down
+                if ((followingElementPrev.y + 1 == followingElementCurr.y) && 
+                    (thisPrev.x + 1 == thisCurr.x)) {
+                    this->data = char(snakeTurningLeftUpASCII);
+                }
+
+            // Going left up
+                if ((followingElementPrev.x - 1 == followingElementCurr.x) && 
+                    (thisPrev.y - 1 == thisCurr.y)) {
+                    this->data = char(snakeTurningLeftUpASCII);
+                }
+
+                // When we're going left and the go up
+                if ((followingElementPrev.y - 1 == followingElementCurr.y) && 
+                    (thisPrev.x - 1 == thisCurr.x)) {
+                    this->data = char(snakeTurningRightDownASCII);
+                }
+            
+            // Going left down
+                if ((followingElementPrev.x - 1 == followingElementCurr.x) &&
+                    (thisPrev.y + 1 == thisCurr.y)) {
+                    this->data = char(snakeTurningLeftDownASCII);
+                }
+                
+                // When we're going left and the down
+                if ((followingElementPrev.y + 1 == followingElementCurr.y) && 
+                    (thisPrev.x - 1 == thisCurr.x)) {
+                    this->data = char(snakeTurningRightUpASCII);
+                }
         }
         (this->gridPtr->data()[this->position.y][this->position.x] = this->data) = this->color;
         return _ret;
@@ -590,8 +647,14 @@ int main() {
     // place apple
     placeApple(&grid);
 
+    // for movement delay
     auto start = chrono::high_resolution_clock::now();
     auto updateTimerStart = start;
+    
+    //! flags and corresponding variables
+    // score related
+    bool scoreUpdated = true;
+    string scoreStr;
     while (true)
     {
         // Check input
@@ -613,8 +676,16 @@ int main() {
         // Update timer
         auto currTime = chrono::high_resolution_clock::now();
         auto timePassed = currTime - updateTimerStart;
-        if(chrono::duration_cast<chrono::milliseconds>(timePassed).count() >= ((head.direction == 0 || head.direction == 2) ? 300.f : 200.f)) {
+        if(chrono::duration_cast<chrono::milliseconds>(timePassed).count() >= 200.f) {
+            // for score checking
+            int prevPoints = head.points;
+
             moveSnake(&head, &tail); 
+
+            // Check if points changed
+            if (head.points != prevPoints) 
+                scoreUpdated = true;
+
             // Draw only when snake has moved
             moveCursor(0, 0);
             for (auto row : grid) {
@@ -627,7 +698,16 @@ int main() {
         }
 
         moveCursor(0, GRID_ROWS);
-        cout << "Pts: " << head.points;
+
+        if (scoreUpdated) {
+            scoreUpdated = false;
+            // update score
+            scoreStr = to_string(head.points);
+            while(scoreStr.length() <= 3) 
+                scoreStr = "0" + scoreStr;
+        }
+
+        cout << "Pts: " << setw(3) << right << scoreStr;
     }
     
     restartGame(head, &tail, &grid);
