@@ -705,9 +705,10 @@ int main() {
             scoreStr = to_string(head.points);
             while(scoreStr.length() <= 3) 
                 scoreStr = "0" + scoreStr;
+            // redraw score
+            cout << "Pts: " << setw(3) << right << scoreStr;
         }
 
-        cout << "Pts: " << setw(3) << right << scoreStr;
     }
     
     restartGame(head, &tail, &grid);
