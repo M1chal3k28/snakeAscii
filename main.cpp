@@ -22,6 +22,9 @@ using namespace std::chrono_literals;
 
 #define redColor "\033[31m"
 #define greenColor "\033[32m"
+#define yellowColor "\033[33m"
+#define resetColor "\033[0m"
+#define boldStyle "\033[1m"
 #define defaultColor "\033[0m"
 
 #ifdef _WIN32
@@ -44,16 +47,18 @@ using namespace std::chrono_literals;
     }    
 #endif
 
-class CellColor {
+class CellStyle {
 public:
-    CellColor() = delete;
-    CellColor(CellColor&) = delete;
+    CellStyle() = delete;
+    CellStyle(CellStyle&) = delete;
 
     // Enum representing different cell colors
     enum Value {
-        Red = 0,   ///< Red color
-        Green,     ///< Green color
-        Default    ///< Default color (no color)
+        Red       = 0b00001,      ///< Red color
+        Green     = 0b00010,      ///< Green color
+        Default   = 0b00100,      ///< Default color, style (no color, no style)
+        Bold      = 0b01000,      ///< Bold style
+        Yellow    = 0b10000,      ///< Yellow color
     };
 
     // Static function to draw a cell with the specified color
@@ -61,21 +66,30 @@ public:
      * @param color The color to use for drawing the cell
      * @param toDraw The character to draw
      */
-    static void drawWithColor(CellColor::Value& color, char& toDraw) {
-        switch (color)
-        {
-        case CellColor::Red:
-            cout << redColor << toDraw << defaultColor;
-            break;
-        
-        case CellColor::Green:
-            cout << greenColor << toDraw << defaultColor;
-            break;
+    static void drawWithStyle(CellStyle::Value styles, char& toDraw) {
+        string stylesStr = "";
+        if (styles & Red)    stylesStr += redColor;
+        if (styles & Green)  stylesStr += greenColor;
+        if (styles & Bold)   stylesStr += boldStyle;
+        if (styles & Yellow) stylesStr += yellowColor;
+        if (styles & Default) stylesStr += defaultColor;
+        string result = stylesStr + toDraw + defaultColor;
+        cout << result;
 
-        default:
-            cout << toDraw;
-            break;
-        }
+        // switch (color)
+        // {
+        // case CellStyle::Red:
+        //     cout << redColor << toDraw << defaultColor;
+        //     break;
+        
+        // case CellStyle::Green:
+        //     cout << greenColor << toDraw << defaultColor;
+        //     break;
+
+        // default:
+        //     cout << toDraw;
+        //     break;
+        // }
     }
 };
 
@@ -89,9 +103,9 @@ public:
     // character of the cell
     char data;
     // color of the cell
-    CellColor::Value color;
+    CellStyle::Value color;
     
-    GridCell(char data, CellColor::Value color)
+    GridCell(char data, CellStyle::Value color)
         : data(data), color(color) {}
     
     // Assignment operator to set the data of the cell
@@ -109,7 +123,7 @@ public:
      * @param color The new color of the cell
      * @return A reference to the GridCell object
      */
-    GridCell& operator=(CellColor::Value color) {
+    GridCell& operator=(CellStyle::Value color) {
         this->color = color;
         return *this;
     }
@@ -145,10 +159,10 @@ public:
 
     // Function to draw the cell with the specified color
     /**
-     * Draws the cell using the CellColor::drawWithColor function
+     * Draws the cell using the CellColor::drawWithStyle function
      */
     void draw() {
-        CellColor::drawWithColor(this->color, this->data);
+        CellStyle::drawWithStyle(this->color, this->data);
     }
 };
 
@@ -249,7 +263,7 @@ void disableConsoleResizing() {
         SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)WindowProc);
 
         LONG style = GetWindowLong(hwnd, GWL_STYLE);
-        style &= ~(WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_HSCROLL | WS_VSCROLL);
+        style &= ~(WS_THICKFRAME | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_HSCROLL | WS_VSCROLL);
         SetWindowLong(hwnd, GWL_STYLE, style);
 
         SetWindowPos(hwnd, NULL, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
@@ -351,7 +365,7 @@ public:
      */
     Position move(int x, int y) {
         Position _ret = this->position;
-        (this->gridPtr->data()[this->position.y][this->position.x] = char(backGroudASCII)) = CellColor::Default;
+        (this->gridPtr->data()[this->position.y][this->position.x] = char(backGroudASCII)) = CellStyle::Default;
 
         this->position.x = x;
         this->position.y = y;
@@ -392,7 +406,7 @@ bool placeApple(vector<vector<GridCell>> * grid) {
     // if there are free spaces, place an apple there
     if (freePos.size() > 0) {
         int index = rand() % freePos.size();
-        (grid->data()[freePos[index].y][freePos[index].x] = char(appleASCII)) = CellColor::Red;
+        (grid->data()[freePos[index].y][freePos[index].x] = char(appleASCII)) = CellStyle::Red;
         return true;
     } 
 
@@ -403,7 +417,7 @@ bool placeApple(vector<vector<GridCell>> * grid) {
 void addBody(SnakeBody ** tail) {
     (*tail)->next = new SnakeBody(
         GridCell((*tail)->data, 
-        CellColor::Default), 
+        CellStyle::Default), 
         *tail, 
         (*tail)->gridPtr, 
         (*tail)->position.y, 
@@ -426,8 +440,8 @@ void restartGame(SnakeBody & head, SnakeBody ** tail,vector<vector<GridCell>> * 
         // set temporary pointer
         SnakeBody * next = it->next;
 
-        // clear grid on this position
-        (grid->data()[it->position.y][it->position.x] = char(backGroudASCII)) = CellColor::Default;
+        // // clear grid on this position
+        // (grid->data()[it->position.y][it->position.x] = char(backGroudASCII)) = CellColor::Default;
 
         // delete element
         delete it;
@@ -436,11 +450,18 @@ void restartGame(SnakeBody & head, SnakeBody ** tail,vector<vector<GridCell>> * 
         it = next;
     }
 
+    // Clear grid
+    for (int i = 1; i < grid->size() - 1; i++) {
+        for (int j = 1; j < grid->data()[i].size() - 1; j++) {
+            (grid->data()[i][j] = char(backGroudASCII)) = CellStyle::Default;
+        }
+    }
+
     // set head position to start position
     // reset head
-    (grid->data()[head.position.y][head.position.x] = char(backGroudASCII)) = CellColor::Default;
-    head.position.x = grid->size() / 2;
-    head.position.y = grid->size() / 2;
+    (grid->data()[head.position.y][head.position.x] = char(backGroudASCII)) = CellStyle::Default;
+    head.position.x = GRID_COLLS / 2 - 1;
+    head.position.y = GRID_ROWS / 2 - 1;
     head.next = nullptr;
     head.prev = nullptr;
     head.direction = 0;
@@ -449,6 +470,7 @@ void restartGame(SnakeBody & head, SnakeBody ** tail,vector<vector<GridCell>> * 
     (*tail) = &head;
 
     head.points = 0;
+    placeApple(head.gridPtr);
 }
 
 // Function to end the game if the player dies
@@ -462,7 +484,11 @@ void gameOver(SnakeBody & head, SnakeBody ** tail, vector<vector<GridCell>> * gr
             return;
         }
     #endif
-
+    
+    // clear game memory and exit
+    restartGame(head, tail, head.gridPtr);
+    (*tail) = nullptr;
+    delete *tail;
     // exit game if user chooses to quit
     exit(0);
 }
@@ -540,25 +566,25 @@ int main() {
     // Set up grid
     vector<vector<GridCell>> grid 
         = vector<vector<GridCell>>
-        (GRID_ROWS, vector<GridCell>(GRID_COLLS, GridCell(char(backGroudASCII), CellColor::Default)));
+        (GRID_ROWS, vector<GridCell>(GRID_COLLS, GridCell(char(backGroudASCII), CellStyle::Default)));
     
     for (int i = 0; i < GRID_ROWS; i++) {
-        (grid[i][GRID_COLLS - 1] = char(snakeBodyASCII)) = CellColor::Green;
-        (grid[i][0] = char(snakeBodyASCII)) = CellColor::Green;
+        (grid[i][GRID_COLLS - 1] = char(snakeBodyASCII)) = (CellStyle::Value)(CellStyle::Green | CellStyle::Bold);
+        (grid[i][0] = char(snakeBodyASCII)) = (CellStyle::Value)(CellStyle::Green | CellStyle::Bold);
     }
 
     for (int i = 0; i < GRID_COLLS; i++) {
-        (grid[GRID_ROWS - 1][i] = char(snakeBodyHorizontalASCII)) = CellColor::Green;
-        (grid[0][i] = char(snakeBodyHorizontalASCII)) = CellColor::Green;
+        (grid[GRID_ROWS - 1][i] = char(snakeBodyHorizontalASCII)) = (CellStyle::Value)(CellStyle::Green | CellStyle::Bold);
+        (grid[0][i] = char(snakeBodyHorizontalASCII)) = (CellStyle::Value)(CellStyle::Green | CellStyle::Bold);
     }
     
-    (grid[GRID_ROWS - 1][GRID_COLLS - 1] = char(snakeTurningLeftDownASCII)) = CellColor::Green;
-    (grid[GRID_ROWS - 1][0] = char(snakeTurningRightDownASCII)) = CellColor::Green;
-    (grid[0][0] = char(snakeTurningRightUpASCII)) = CellColor::Green;
-    (grid[0][GRID_COLLS - 1] = char(snakeTurningLeftUpASCII)) = CellColor::Green;
+    (grid[GRID_ROWS - 1][GRID_COLLS - 1] = char(snakeTurningLeftDownASCII)) = (CellStyle::Value)(CellStyle::Green | CellStyle::Bold);
+    (grid[GRID_ROWS - 1][0] = char(snakeTurningRightDownASCII)) = (CellStyle::Value)(CellStyle::Green | CellStyle::Bold);
+    (grid[0][0] = char(snakeTurningRightUpASCII)) = (CellStyle::Value)(CellStyle::Green | CellStyle::Bold);
+    (grid[0][GRID_COLLS - 1] = char(snakeTurningLeftUpASCII)) =  (CellStyle::Value)(CellStyle::Green | CellStyle::Bold);
 
     // Create snake object
-    SnakeBody head = SnakeBody(GridCell(char(appleASCII), CellColor::Red), nullptr, &grid, 1, 1);
+    SnakeBody head = SnakeBody(GridCell(char(appleASCII), CellStyle::Yellow), nullptr, &grid, GRID_ROWS / 2 - 1, GRID_COLLS / 2 - 1);
     SnakeBody * tail = &head;
 
     // place apple
@@ -604,5 +630,8 @@ int main() {
         cout << "Pts: " << head.points;
     }
     
+    restartGame(head, &tail, &grid);
+    tail = nullptr;
+    delete tail;
     return 0;
 }
