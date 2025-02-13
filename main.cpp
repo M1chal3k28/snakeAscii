@@ -5,6 +5,7 @@
 #include <conio.h>
 #include <cstdlib>
 #include <iomanip>
+#include <sstream>
 
 using namespace std;
 using namespace std::chrono_literals;
@@ -76,21 +77,6 @@ public:
         if (styles & Default) stylesStr += defaultColor;
         string result = stylesStr + toDraw + defaultColor;
         cout << result;
-
-        // switch (color)
-        // {
-        // case CellStyle::Red:
-        //     cout << redColor << toDraw << defaultColor;
-        //     break;
-        
-        // case CellStyle::Green:
-        //     cout << greenColor << toDraw << defaultColor;
-        //     break;
-
-        // default:
-        //     cout << toDraw;
-        //     break;
-        // }
     }
 };
 
@@ -555,8 +541,9 @@ void gameOver(SnakeBody & head, SnakeBody ** tail, vector<vector<GridCell>> * gr
  * @brief moves the snake
  * @param body The head of the snake
  * @param tail The tail of the snake
+ * @return returns **true when snake died and **false when game should continue
  */
-void moveSnake(SnakeBody * body, SnakeBody ** tail) {
+bool moveSnake(SnakeBody * body, SnakeBody ** tail) {
     // Get previous position
     int prevX = body->position.x, prevY = body->position.y;
 
@@ -586,12 +573,12 @@ void moveSnake(SnakeBody * body, SnakeBody ** tail) {
 
        if (!placeApple(body->gridPtr)) {
            gameOver(*body, tail, body->gridPtr);
-           return;
+           return true;
        }
     } // Check if player should die 
     else if(body->gridPtr->data()[prevY][prevX] != char(backGroudASCII)) {
         gameOver(*body, tail, body->gridPtr);
-        return;
+        return true;
     }
 
     // Move snake parts
@@ -604,6 +591,8 @@ void moveSnake(SnakeBody * body, SnakeBody ** tail) {
 
         body = body->next;
     }
+
+    return false;
 }
 
 int main() {
@@ -650,11 +639,15 @@ int main() {
     // for movement delay
     auto start = chrono::high_resolution_clock::now();
     auto updateTimerStart = start;
-    
+
     //! flags and corresponding variables
     // score related
     bool scoreUpdated = true;
     string scoreStr;
+    // for game duration
+    auto gameStart = start; // Just to initialize
+    int gameTimeInSeconds = 0;
+    bool timeUpdated = true;
     while (true)
     {
         // Check input
@@ -672,15 +665,35 @@ int main() {
                 head.direction = 3;
             }
         }
-
-        // Update timer
+        
+        // Get current time
         auto currTime = chrono::high_resolution_clock::now();
+        // Update timer of movement
         auto timePassed = currTime - updateTimerStart;
+        // Update game time 
+        auto gameTime = currTime - gameStart;
+        int _gameTimeInSeconds = chrono::duration_cast<chrono::seconds>(gameTime).count();
+        // If game time changed update time in seconds
+        if (_gameTimeInSeconds > gameTimeInSeconds) {
+            gameTimeInSeconds = _gameTimeInSeconds;
+            timeUpdated = true;
+        }
+
         if(chrono::duration_cast<chrono::milliseconds>(timePassed).count() >= 200.f) {
             // for score checking
             int prevPoints = head.points;
 
-            moveSnake(&head, &tail); 
+            bool playerDied = moveSnake(&head, &tail); 
+
+            // if player died
+            if (playerDied) {
+                // new round starts so restart gameStart
+                gameStart = chrono::high_resolution_clock::now();
+                // set time to 0
+                gameTimeInSeconds = 0;
+                // update time
+                timeUpdated = true;
+            }
 
             // Check if points changed
             if (head.points != prevPoints) 
@@ -697,8 +710,7 @@ int main() {
             updateTimerStart = currTime;
         }
 
-        moveCursor(0, GRID_ROWS);
-
+        // Redraw score on update
         if (scoreUpdated) {
             scoreUpdated = false;
             // update score
@@ -706,9 +718,38 @@ int main() {
             while(scoreStr.length() <= 3) 
                 scoreStr = "0" + scoreStr;
             // redraw score
-            cout << "Pts: " << setw(3) << right << scoreStr;
+            moveCursor(0, GRID_ROWS);
+            cout << "Pts -> " << setw(3) << right << scoreStr;
         }
 
+        if (timeUpdated) {
+            timeUpdated = false;
+
+            // Format is "{minutes} m {seconds} s <- Time";
+            stringstream timeStringStream;
+            int minutes = gameTimeInSeconds / 60;
+            int seconds = gameTimeInSeconds % 60;
+
+            // minutes string with following 0 when need
+            string minutesString = to_string(minutes);
+            while(minutesString.length() < 2)
+                minutesString = "0" + minutesString;
+
+            // seconds string with following 0 whe need
+            string secondsString = to_string(seconds);
+            while(secondsString.length() < 2)
+                secondsString = "0" + secondsString;
+            
+            // Create sstream
+            timeStringStream << minutesString << "m " << secondsString << "s <- Time";
+            // Get string from it
+            string timeString = timeStringStream.str();
+            // Get length of it to properly set console cursor
+            int length = timeString.length();
+            moveCursor(GRID_COLLS - length, GRID_ROWS);
+            // Draw time string 
+            cout << timeString;
+        }
     }
     
     restartGame(head, &tail, &grid);
